@@ -1,0 +1,19 @@
+{
+  "name": "nodeKillService",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node process.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.21.0",
+    "commander": "^6.2.0",
+    "cpf-cnpj-validator": "^1.0.3",
+    "dotenv": "^8.2.0",
+    "node-schedule": "^1.3.2",
+    "node-windows": "^1.0.0-beta.5",
+    "pkg": "^4.4.9",
+    "prompts": "^2.4.0"
+  }
+}

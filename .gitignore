@@ -1,0 +1,6 @@
+daemon
+node
+node_modules
+*rar
+*lock.json
+.vscode
