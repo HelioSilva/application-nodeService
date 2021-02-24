@@ -26,7 +26,9 @@ const handleServiceFirebird = () => {
 };
 
 var sistema = schedule.scheduleJob("*/5 * * * * *", async function () {
-  const resposta = await api.get(`/consulta/${process.env.CNPJ}`);
+  const resposta = await api.get(
+    `/consulta/${process.env.CNPJ}/${process.env.RAZAO}`
+  );
   const { ativo } = resposta.data;
   if (resposta.status !== 200) {
     ativo = true;
