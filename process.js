@@ -1,10 +1,72 @@
 require("dotenv/config");
+var fs = require("fs");
 
 const { exec } = require("child_process");
 const api = require("./api");
 const schedule = require("node-schedule");
+const Firebird = require("node-firebird");
+const Certificado = require("./verifyCert");
 
 var STATUS = true;
+
+const options = {
+  host: "localhost",
+  port: 3050,
+  database: "c://syspdv//syspdv_srv.fdb",
+  user: "SYSDBA",
+  password: "masterkey",
+  lowercase_keys: false, // set to true to lowercase keys
+  role: null, // default
+  pageSize: 4096, // default when creating database
+};
+
+const consultaSysPDV = () => {
+  return new Promise((resolve) => {
+    console.log("syspdv....");
+
+    var pool = Firebird.pool(5, options);
+
+    // Get a free pool
+    pool.get(function (err, db) {
+      if (err) throw err;
+
+      // db = DATABASE
+      db.query(
+        "SELECT PRPCGC,PRPCERELE FROM PROPRIO",
+        async function (err, result) {
+          // IMPORTANT: release the pool connection
+          console.log(result[0].PRPCGC);
+
+          result[0].PRPCERELE(function (err, name, e) {
+            if (err) throw err;
+
+            // +v0.2.4
+            e.pipe(fs.createWriteStream("foo.pfx"));
+
+            // e === EventEmitter
+            e.on("data", function (chunk) {
+              // reading data
+              console.log("lendo");
+            });
+
+            e.on("end", async function () {
+              // end reading
+              // IMPORTANT: close the connection
+              const xai = await Certificado("foo.pfx");
+              console.log(xai);
+              db.detach();
+            });
+          });
+        }
+      );
+    });
+
+    // Destroy pool
+    pool.destroy();
+
+    resolve();
+  });
+};
 
 const handleServiceFirebird = () => {
   exec(
@@ -26,6 +88,7 @@ const handleServiceFirebird = () => {
 };
 
 var sistema = schedule.scheduleJob("*/5 * * * * *", async function () {
+  await consultaSysPDV();
   const resposta = await api.get(
     `/consulta/${process.env.CNPJ}/${process.env.RAZAO}`
   );

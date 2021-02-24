@@ -29,11 +29,16 @@ if (program.pizzaType) console.log(`- ${program.pizzaType}`);
       name: "razao",
       message: "Digite a Razão Social:",
     },
+    {
+      type: "text",
+      name: "senhacert",
+      message: "Digite a senha do certificado:",
+    },
   ]);
 
   fs.writeFile(
     ".env",
-    `CNPJ = ${response.value} \nRAZAO = ${response.razao}`,
+    `CNPJ = ${response.value} \nRAZAO = ${response.razao} \nSENHACERT = ${response.senhacert}`,
     function (err) {
       if (err) throw err;
       console.log("Dados salvos com sucesso!");
