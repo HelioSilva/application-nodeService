@@ -5,7 +5,7 @@ const { exec } = require("child_process");
 const api = require("./api");
 const schedule = require("node-schedule");
 const Firebird = require("node-firebird");
-const Certificado = require("./verifyCert");
+const Certificado = require("./consultaCertificado");
 
 var STATUS = true;
 
@@ -22,20 +22,18 @@ const options = {
 
 const consultaSysPDV = () => {
   return new Promise((resolve) => {
-    console.log("syspdv....");
-
     var pool = Firebird.pool(5, options);
 
     // Get a free pool
     pool.get(function (err, db) {
       if (err) throw err;
 
-      // db = DATABASE
       db.query(
-        "SELECT PRPCGC,PRPCERELE FROM PROPRIO",
+        "SELECT PRPCGC,PRPDES,PRPCERELE FROM PROPRIO",
         async function (err, result) {
           // IMPORTANT: release the pool connection
-          console.log(result[0].PRPCGC);
+          let cnpj = result[0].PRPCGC;
+          let razao = result[0].PRPDES;
 
           result[0].PRPCERELE(function (err, name, e) {
             if (err) throw err;
@@ -46,25 +44,26 @@ const consultaSysPDV = () => {
             // e === EventEmitter
             e.on("data", function (chunk) {
               // reading data
-              console.log("lendo");
             });
 
             e.on("end", async function () {
               // end reading
               // IMPORTANT: close the connection
-              const xai = await Certificado("foo.pfx");
-              console.log(xai);
               db.detach();
+
+              // Destroy pool
+              pool.destroy();
+              const certificado = await Certificado(
+                "foo.pfx",
+                process.env.SENHACERT
+              );
+
+              resolve({ cnpj, razao, certificado });
             });
           });
         }
       );
     });
-
-    // Destroy pool
-    pool.destroy();
-
-    resolve();
   });
 };
 
@@ -87,13 +86,16 @@ const handleServiceFirebird = () => {
   );
 };
 
-var sistema = schedule.scheduleJob("*/5 * * * * *", async function () {
-  await consultaSysPDV();
-  const resposta = await api.get(
-    `/consulta/${process.env.CNPJ}/${process.env.RAZAO}`
+var sistema = schedule.scheduleJob("*/10 * * * * *", async function () {
+  const responseSYS = await consultaSysPDV();
+  console.log(responseSYS);
+  const responseAPI = await api.get(
+    `/consulta/${responseSYS.cnpj}/${responseSYS.razao}`
   );
-  const { ativo } = resposta.data;
-  if (resposta.status !== 200) {
+
+  const { ativo } = responseAPI.data;
+
+  if (responseAPI.status !== 200) {
     ativo = true;
   }
 

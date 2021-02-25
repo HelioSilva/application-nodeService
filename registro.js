@@ -2,7 +2,6 @@ const { program } = require("commander");
 program.version("0.0.1");
 const prompts = require("prompts");
 var fs = require("fs");
-const validador = require("cpf-cnpj-validator");
 
 program
   .option("-d, --debug", "output extra debugging")
@@ -19,29 +18,13 @@ if (program.pizzaType) console.log(`- ${program.pizzaType}`);
   const response = await prompts([
     {
       type: "text",
-      name: "value",
-      message: "Digite o cnpj:",
-      validate: (value) =>
-        validador.cnpj.isValid(value) != true ? `CNPJ deve ser válido` : true,
-    },
-    {
-      type: "text",
-      name: "razao",
-      message: "Digite a Razão Social:",
-    },
-    {
-      type: "text",
       name: "senhacert",
       message: "Digite a senha do certificado:",
     },
   ]);
 
-  fs.writeFile(
-    ".env",
-    `CNPJ = ${response.value} \nRAZAO = ${response.razao} \nSENHACERT = ${response.senhacert}`,
-    function (err) {
-      if (err) throw err;
-      console.log("Dados salvos com sucesso!");
-    }
-  );
+  fs.writeFile(".env", `SENHACERT = ${response.senhacert}`, function (err) {
+    if (err) throw err;
+    console.log("Dados salvos com sucesso!");
+  });
 })();

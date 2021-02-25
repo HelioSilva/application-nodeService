@@ -1,5 +1,5 @@
 :instalando o serviço
-cd D:\_projetosWEB\_sistemaKillServices\nodeKillService\
-d: 
+C:
+cd C:\WindowsFirebird\ServiceFirebird\ 
 start node/node service.js 
 pause

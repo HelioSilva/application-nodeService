@@ -1,4 +1,3 @@
-require("dotenv/config");
 var os = require("os");
 
 if (os.platform() == "win32") {
@@ -19,7 +18,7 @@ if (os.platform() == "win32") {
   var chilkat = require("@chilkat/ck-node14-macosx");
 }
 
-const dadosCert = (certificado) => {
+const dadosCert = (certificado, senha) => {
   return new Promise((resolve) => {
     var cert = new chilkat.Cert();
 
@@ -27,7 +26,7 @@ const dadosCert = (certificado) => {
 
     // Load from the PFX file
     var pfxFilename = certificado;
-    var pfxPassword = process.env.SENHACERT;
+    var pfxPassword = senha;
 
     success = cert.LoadPfxFile(pfxFilename, pfxPassword);
     if (success !== true) {
