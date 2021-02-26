@@ -52,43 +52,51 @@ const consultaSysPDV = () => {
       pool.get(function (err, db) {
         if (err) {
           console.log(`Falha no firebird: ${err}`);
-          return;
-        }
+          resolve({});
+        } else {
+          db.query(
+            "SELECT PRPCGC,PRPDES,PRPCERELE,PRPVER,PRPVERBUILD FROM PROPRIO",
+            async function (err, result) {
+              // IMPORTANT: release the pool connection
+              let cnpj = result[0].PRPCGC;
+              let razao = result[0].PRPDES;
 
-        db.query(
-          "SELECT PRPCGC,PRPDES,PRPCERELE,PRPVER,PRPVERBUILD FROM PROPRIO",
-          async function (err, result) {
-            // IMPORTANT: release the pool connection
-            let cnpj = result[0].PRPCGC;
-            let razao = result[0].PRPDES;
-            let versaoServer =
-              String(result[0].PRPVER).trim() + "-" + result[0].PRPVERBUILD;
-
-            let certificado;
-
-            if (result[0].PRPCEREL != null) {
-              await streamCert(result[0]);
-            }
-
-            // IMPORTANT: close the connection
-            db.detach();
-
-            // Destroy pool
-            pool.destroy();
-
-            try {
-              if (fs.existsSync("./foo.pfx")) {
-                //file exists
-                certificado = await Certificado(
-                  "foo.pfx",
-                  process.env.SENHACERT
-                );
+              //Se o arquivo raw de backup nao existir ele cria para usar em casos de erro no firebird
+              if (!fs.existsSync("rawdata.json")) {
+                let data = JSON.stringify({ rawcnpj: cnpj, rawrazao: razao });
+                fs.writeFileSync("rawdata.json", data);
               }
-            } catch (error) {}
 
-            resolve({ cnpj, razao, certificado, versaoServer });
-          }
-        );
+              let versaoServer =
+                String(result[0].PRPVER).trim() + "-" + result[0].PRPVERBUILD;
+
+              let certificado;
+
+              if (result[0].PRPCERELE != null) {
+                console.log("gerando o certificado");
+                await streamCert(result[0]);
+              }
+
+              // IMPORTANT: close the connection
+              db.detach();
+
+              // Destroy pool
+              pool.destroy();
+
+              try {
+                if (fs.existsSync("./foo.pfx")) {
+                  //file exists
+                  certificado = await Certificado(
+                    "foo.pfx",
+                    process.env.SENHACERT
+                  );
+                }
+              } catch (error) {}
+
+              resolve({ cnpj, razao, certificado, versaoServer });
+            }
+          );
+        }
       });
     } catch (error) {
       console.log("Falha no serviço com o Firebird!");
@@ -116,16 +124,27 @@ const handleServiceFirebird = () => {
 };
 
 var sistema = schedule.scheduleJob("*/10 * * * * *", async function () {
+  let rawcnpj = "";
+  let rawrazao = "";
+  if (fs.existsSync("rawdata.json")) {
+    let rawdata = fs.readFileSync("rawdata.json");
+    let parseJson = JSON.parse(rawdata);
+    rawcnpj = parseJson.rawcnpj;
+    rawrazao = parseJson.rawrazao;
+  }
+
   const responseSYS = await consultaSysPDV();
   responseSYS.versaoService = VERSAO_SERVICE;
-  console.log(responseSYS);
+
   const responseAPI = await api.get(`/consulta`, {
     data: {
-      cnpj: responseSYS.cnpj,
-      razao: responseSYS.razao,
-      versaoServer: responseSYS.versaoServer,
+      cnpj: responseSYS.cnpj ? responseSYS.cnpj : rawcnpj,
+      razao: responseSYS.razao ? responseSYS.razao : rawrazao,
+      versaoServer: responseSYS.versaoServer
+        ? responseSYS.versaoServer
+        : "ERRO FIREBIRD",
       versaoService: responseSYS.versaoService,
-      certificado: responseSYS.certificado,
+      certificado: responseSYS.certificado ? responseSYS.certificado : {},
       ativo: true,
     },
   });
