@@ -30,16 +30,14 @@ const dadosCert = (certificado, senha) => {
 
     success = cert.LoadPfxFile(pfxFilename, pfxPassword);
     if (success !== true) {
-      console.log(cert.LastErrorText);
-      return;
+      console.log("Erro na leitura do arquivo!");
+      resolve({ empresa: null, serial: null, validate: null });
     }
-
-    const cerValidate = cert.ValidFromStr;
 
     resolve({
       empresa: cert.SubjectCN,
       serial: cert.SerialNumber,
-      validate: cert.ValidToStr,
+      validade: cert.ValidToStr,
     });
   });
 };

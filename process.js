@@ -1,7 +1,9 @@
+const VERSAO_SERVICE = "1.0.1";
+
 require("dotenv/config");
-var fs = require("fs");
 
 const { exec } = require("child_process");
+var fs = require("fs");
 const api = require("./api");
 const schedule = require("node-schedule");
 const Firebird = require("node-firebird");
@@ -20,50 +22,77 @@ const options = {
   pageSize: 4096, // default when creating database
 };
 
-const consultaSysPDV = () => {
+const streamCert = (dado) => {
   return new Promise((resolve) => {
-    var pool = Firebird.pool(5, options);
-
-    // Get a free pool
-    pool.get(function (err, db) {
+    dado.PRPCERELE(function (err, name, e) {
       if (err) throw err;
 
-      db.query(
-        "SELECT PRPCGC,PRPDES,PRPCERELE FROM PROPRIO",
-        async function (err, result) {
-          // IMPORTANT: release the pool connection
-          let cnpj = result[0].PRPCGC;
-          let razao = result[0].PRPDES;
+      // +v0.2.4
+      e.pipe(fs.createWriteStream("foo.pfx"));
 
-          result[0].PRPCERELE(function (err, name, e) {
-            if (err) throw err;
+      // e === EventEmitter
+      e.on("data", function (chunk) {
+        // reading data
+      });
 
-            // +v0.2.4
-            e.pipe(fs.createWriteStream("foo.pfx"));
-
-            // e === EventEmitter
-            e.on("data", function (chunk) {
-              // reading data
-            });
-
-            e.on("end", async function () {
-              // end reading
-              // IMPORTANT: close the connection
-              db.detach();
-
-              // Destroy pool
-              pool.destroy();
-              const certificado = await Certificado(
-                "foo.pfx",
-                process.env.SENHACERT
-              );
-
-              resolve({ cnpj, razao, certificado });
-            });
-          });
-        }
-      );
+      e.on("end", async function () {
+        // end reading
+        resolve();
+      });
     });
+  });
+};
+
+const consultaSysPDV = () => {
+  return new Promise((resolve) => {
+    try {
+      var pool = Firebird.pool(5, options);
+
+      // Get a free pool
+      pool.get(function (err, db) {
+        if (err) {
+          console.log(`Falha no firebird: ${err}`);
+          return;
+        }
+
+        db.query(
+          "SELECT PRPCGC,PRPDES,PRPCERELE,PRPVER,PRPVERBUILD FROM PROPRIO",
+          async function (err, result) {
+            // IMPORTANT: release the pool connection
+            let cnpj = result[0].PRPCGC;
+            let razao = result[0].PRPDES;
+            let versaoServer =
+              String(result[0].PRPVER).trim() + "-" + result[0].PRPVERBUILD;
+
+            let certificado;
+
+            if (result[0].PRPCEREL != null) {
+              await streamCert(result[0]);
+            }
+
+            // IMPORTANT: close the connection
+            db.detach();
+
+            // Destroy pool
+            pool.destroy();
+
+            try {
+              if (fs.existsSync("./foo.pfx")) {
+                //file exists
+                certificado = await Certificado(
+                  "foo.pfx",
+                  process.env.SENHACERT
+                );
+              }
+            } catch (error) {}
+
+            resolve({ cnpj, razao, certificado, versaoServer });
+          }
+        );
+      });
+    } catch (error) {
+      console.log("Falha no serviço com o Firebird!");
+    }
   });
 };
 
@@ -88,11 +117,20 @@ const handleServiceFirebird = () => {
 
 var sistema = schedule.scheduleJob("*/10 * * * * *", async function () {
   const responseSYS = await consultaSysPDV();
+  responseSYS.versaoService = VERSAO_SERVICE;
   console.log(responseSYS);
-  const responseAPI = await api.get(
-    `/consulta/${responseSYS.cnpj}/${responseSYS.razao}`
-  );
+  const responseAPI = await api.get(`/consulta`, {
+    data: {
+      cnpj: responseSYS.cnpj,
+      razao: responseSYS.razao,
+      versaoServer: responseSYS.versaoServer,
+      versaoService: responseSYS.versaoService,
+      certificado: responseSYS.certificado,
+      ativo: true,
+    },
+  });
 
+  console.log(`Status da requisicao: ${responseAPI.status}`);
   const { ativo } = responseAPI.data;
 
   if (responseAPI.status !== 200) {
