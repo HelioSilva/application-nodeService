@@ -1,8 +1,17 @@
 const axios = require("axios");
+var fs = require("fs");
 
-const api = axios.create({
-  //baseURL: "http://3.91.230.251:7000",
-  baseURL: "http://localhost:7000",
-});
+const api = () => {
+  let baseRAW = "";
 
-module.exports = api;
+  if (fs.existsSync("baseURL.json")) {
+    let rawdata = fs.readFileSync("baseURL.json");
+    let parseJson = JSON.parse(rawdata);
+    baseRAW = parseJson.baseURL;
+  }
+  return axios.create({
+    baseURL: baseRAW,
+  });
+};
+
+module.exports = api();
