@@ -13,4 +13,11 @@ var svc = new Service({
 svc.on("install", function () {
   svc.start();
 });
+
+//Listen for the start
+//Verify update this project
+svc.on("start", () => {
+  console.log("Serviço iniciado");
+});
+
 svc.install();
